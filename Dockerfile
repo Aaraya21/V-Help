@@ -1,7 +1,7 @@
-
 FROM php:8.2-apache
 
-RUN apt-get update && apt-get install -y \
+# Install required packages
+RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     unzip \
     zip \
@@ -11,32 +11,39 @@ RUN apt-get update && apt-get install -y \
     libfreetype6-dev \
     libonig-dev \
     libxml2-dev \
-    && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install pdo pdo_mysql mbstring zip gd \
-    && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-RUN docker-php-ext-configure gd \
-    --with-freetype \
-    --with-jpeg
-
-RUN docker-php-ext-install \
+# Configure and install PHP extensions
+RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install \
     pdo \
     pdo_mysql \
     mbstring \
     zip \
-    exif \
-    pcntl \
     gd
 
+# Enable Apache rewrite module
 RUN a2enmod rewrite
 
-COPY . /var/www/html
-
+# Set working directory
 WORKDIR /var/www/html
 
-RUN sed -i 's!/var/www/html!/var/www/html/public!g' /etc/apache2/sites-available/000-default.conf
+# Copy project files
+COPY . /var/www/html
 
-RUN chown -R www-data:www-data storage bootstrap/cache
+# Set permissions
+RUN chown -R www-data:www-data /var/www/html
 
+# Configure Apache
+ENV APACHE_DOCUMENT_ROOT=/var/www/html
+
+RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' \
+    /etc/apache2/sites-available/*.conf \
+    /etc/apache2/apache2.conf \
+    /etc/apache2/conf-available/*.conf
+
+# Expose port
 EXPOSE 80
+
+# Start Apache
+CMD ["apache2-foreground"]
